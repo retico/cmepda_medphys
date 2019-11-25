@@ -14,3 +14,11 @@
 *.slreqx -crlf -diff -merge
 *.sfx -crlf -diff -merge
 *.sltx -crlf -diff -merge
+
+*.pdf  diff=astextplain
+*.html text
+
+*.png binary
+*.png binary
+*.jpg binary
+*.jpeg binary
