@@ -106,7 +106,7 @@ venv.bak/
 .mypy_cache/
 
 # DATA dir
-DATASETS/
+DATASETS
 
 # slides
 *.pptx
