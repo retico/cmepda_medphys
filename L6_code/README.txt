@@ -1,0 +1,15 @@
+This folder contains scripts, functions and sample images to perform a semiautomated segmentation of a mass lesion in a mammogram. It is a simplified version of the segmentation algorithm developed in the paper by P Delogu, ME Fantacci, P Kasae, A Retico, Computers in Biology and Medicine 37 (2007) 1479 – 1491. 
+
+The user has to chose interactively a rectangular portion of the mammogram around the lesion, and the algorithm will identify the mass borders and provide the lesion mask.
+
+This folder contains:
+- the matlab script script_mass_segment.m, which calls the two custom functions draw_radial_lines.m and max_var_points_interp.m
+
+You can try how the script_mass_segment.m works on the sample images provided here (0016p1_2_1.pgm, 0025p1_4_1.pgm and 0036p1_1_1.pgm) and you will find more images with benign/malignant masses at https://pandora.infn.it/public/cmepda/DATASETS or https://drive.google.com/drive/folders/1YqK7ZkM-P2IrqfD7Pj-SCmjz-GWd_1-Y . 
+Malignant masses are named as xxxx_1.png, whereas benign ones as xxxx_2.png.
+
+You can modify the script to obtain the function mass_segment.m (following the instructions at the end of script_mass_segment.m). Set as arguments for this function all free parameters to enable a performance optimization study.
+
+Use the mass_segment.m function in a new script following the instructions provided in Lecture6_exercise1.pdf with the aim of testing the reproducibility of the segmentation algorithm.
+
+You will find here an example of the mass_segment.m function and of a script (run_segmentation.m), which allows you to run mass_segment.m on all *.png files of a directory. It implements also the possibility to repeat the semiautomated segmentation if the result is not satisfactory.
