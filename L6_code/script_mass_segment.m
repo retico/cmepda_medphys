@@ -24,11 +24,11 @@ clear
 clc
 
 %% 1.1 Reading the input file and
-fileID='0016p1_2_1.pgm';
+%fileID='0016p1_2_1.pgm';
 
 % You can try with another mass
 % fileID='0025p1_4_1.pgm';
-%fileID='0036p1_1_1.pgm';
+fileID='0036p1_1_1.pgm';
 
 %figure; imshow(fileID)
 

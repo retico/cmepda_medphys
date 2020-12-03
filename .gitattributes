@@ -30,4 +30,5 @@
 *.png binary
 *.xlsx binary
 *.xls binary
+*.pgm binary
 *.pgn binary

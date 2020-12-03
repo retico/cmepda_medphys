@@ -15,7 +15,7 @@ function [mass_mask, im_resized]=mass_segment(fileID, varargin)
 % Computers in Biology and Medicine 37 (2007) 1479 – 1491]
 %
 %
-% The main steps are highlighted in different scrip session
+% The main steps are highlighted in different scrip sessions
 %
 % Additional info:
 % The mapping toolbox is required (interpm is used in the function
