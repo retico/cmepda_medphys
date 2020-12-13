@@ -85,7 +85,7 @@ features=data(:,feature_names);
 
 % train a regression model on the reduced set of features
 
-SVMModel =fitrsvm(features,labels,'Standardize',true,'KernelFunction','gaussian');
+SVMModel =fitrsvm(features,labels,'Standardize',true,'KernelFunction','linear');
 
 % we evaluate the model on the training data set, i.e. we are evaluating
 % the regression performance in training
@@ -104,11 +104,12 @@ ylim([0 70])
 %% RMSE
 
 RMSE = sqrt(mean((data.AGE_AT_SCAN-predicted_AGE).^2))
-% No improvement has occurred reducing the nuomber of features
+% No improvement has occurred reducing the number of features
 
 %% Try with different kernels
 
-SVMModel_gauss =fitrsvm(features,labels,'Standardize',true,'KernelFunction','gaussian')
+SVMModel_gauss =fitrsvm(features,labels,'Standardize',true,'KernelFunction','rbf')
+predicted_AGE=predict(SVMModel_gauss,features);
 RMSE = sqrt(mean((data.AGE_AT_SCAN-predicted_AGE).^2))
 % The performance improve 
 
