@@ -1,4 +1,4 @@
-%% Lecture 3 exercise 2 - Browsing 4D NIfTI data sample
+%% Exercise 2 - Browsing 4D NIfTI data sample
 % The objective is to explore 4D data:
 % 1) open a functional MRI (fMRI) NIfTI dataset (4D data);
 % 2) display the fMRI temporal sequence signals corresponding to two

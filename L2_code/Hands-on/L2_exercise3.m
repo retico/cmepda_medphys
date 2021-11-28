@@ -1,4 +1,4 @@
-%% Lecture 3 exercise 3 - Display image overlays 
+%% Exercise 3 - Display image overlays 
 % The objective is to visualize image overlays:
 % 1) load NIfTI file of a 3D structural MRI AD_002_S_0619.nii and segmented tissues:
 %    - c1AD_002_S_0619.nii is the segmented gray matter (GM);

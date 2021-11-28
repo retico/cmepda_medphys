@@ -1,4 +1,4 @@
-%% Lecture 3 exercise 1 -  DICOM file reading and visualizing 
+%% Exercise 1 -  DICOM file reading and visualizing 
 % The objective is: 
 %   1) to read a DICOM folder that contains different series of 2D DICOM
 %   images
