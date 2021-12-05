@@ -19,6 +19,8 @@ figure
 imshowpair(IM1,IM2,'montage')
 figure
 imshowpair(IM1,IM2)
+figure
+imshowpair(IM1,IM2,'diff')
 
 %% coregister 
 fixed=IM1;
@@ -33,11 +35,15 @@ figure
 imshowpair(fixed,movingReg)
 figure
 imshowpair(fixed,movingReg,'montage')
+figure
+imshowpair(fixed,movingReg,'diff')
 
 figure
 imshowpair(moving,movingReg)
 figure
 imshowpair(moving,movingReg,'montage')
+figure
+imshowpair(moving,movingReg,'diff')
 
 %% have a look at the deformation field
 

@@ -1,5 +1,6 @@
 function shape = diamond_bad(r,c,rad,M)
-% input anguments:
+% Returns an image MxM with a diamond of size rad.
+% Input arguments:
 % the row (r) and column (c) image position,
 % the object size (rad),
 % and the squared image matrix size (M)
