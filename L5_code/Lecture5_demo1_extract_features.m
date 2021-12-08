@@ -11,8 +11,14 @@ close all
 
 %% 1. Specify the directory where to find the segmented masses
 
-%DB_path='Im_segmented/'
 DB_path='../DATASETS/IMAGES/Mammography_masses/small_sample_Im_segmented_ref/'
+
+% It we want to run this script from the command line without editing it 
+% we can ask the used to input the DB_path
+%
+% prompt = 'Please, type the path of the folder containing the segmented images to process: ...'
+% DB_path = input(prompt,'s')
+%
 
 %% 2. Read the files containing the images with reduced size and the mass 
 % masks and concatenate the images in single variables contining all cases,
