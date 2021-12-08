@@ -30,7 +30,7 @@ clc
 % fileID='0025p1_4_1.pgm';
 fileID='0036p1_1_1.pgm';
 
-%figure; imshow(fileID)
+figure; imshow(fileID)
 
 image = imread(fileID);
 
@@ -58,20 +58,20 @@ NL=32;                  % used in sec 6.3
 
 mask=ones(smooth_factor,smooth_factor)/smooth_factor^2;
 im_conv=conv2(mask,image); %  we work with doubles from here
-%figure,imagesc(im_conv),colormap(gray),title('smoothed')
+figure,imagesc(im_conv),colormap(gray),title('smoothed')
 
 %% 4. Image Resizing
 % resizing factor is defined in the first section of the script
 
 im_resized=imresize(im_conv,1/scale_factor);
 % By default, imresize uses bicubic interpolation.
-%figure,imagesc(im_resized),colormap(gray),title('resized')
+figure,imagesc(im_resized),colormap(gray),title('resized')
 
 %% 5. Intensity normalization
 % the image intensity is normalized to image maximum
 
 im_norm = im_resized/max(im_resized(:));
-%figure,imagesc(im_norm),colormap(gray),title('normalized image ')
+figure,imagesc(im_norm),colormap(gray),title('normalized image '), colorbar
 
 %% 6 SEGMENTATION of mass lesion
 % 6.1 An expert selects a rectangle enclosing the lesion
@@ -79,7 +79,7 @@ im_norm = im_resized/max(im_resized(:));
 figure,imagesc(im_norm),colormap(gray)
 title('Please select a rectangle containing the mass with the mouse ')
 k = waitforbuttonpress;
-%  waitforbuttonpress blocks statements from executing until the user has 
+% waitforbuttonpress blocks statements from executing until the user has 
 % clicked a mouse button or pressed a key in the current figure.
 
 if k==0
@@ -224,7 +224,7 @@ disp('... done!');
 % pass them to the funcion and modofy sec 2 as follows
 % function [im_resized, mass_mask]=mass_segment(fileID,...
 %   smooth_factor,scale_factor,size_nhood_variance, NL)
-% and comment the value assignements in sec2
+% and comment the value assignments in sec2
 %
 % You can also set default values for optional input arguments
 % --> see mass_segment.m

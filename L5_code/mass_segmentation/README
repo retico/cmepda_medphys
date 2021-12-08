@@ -10,6 +10,6 @@ Malignant masses are named as xxxx_1.png, whereas benign ones as xxxx_2.png.
 
 You can modify the script to obtain the function mass_segment.m (following the instructions at the end of script_mass_segment.m). Set as arguments for this function all free parameters to enable a performance optimization study.
 
-Use the mass_segment.m function in a new script following the instructions provided in Lecture6_exercise1.pdf with the aim of testing the reproducibility of the segmentation algorithm.
+Use the mass_segment.m function in a new script following the instructions provided in Lecture5_exercise1.pdf with the aim of testing the reproducibility of the segmentation algorithm.
 
 You will find here an example of the mass_segment.m function and of a script (run_segmentation.m), which allows you to run mass_segment.m on all *.png files of a directory. It implements also the possibility to repeat the semiautomated segmentation if the result is not satisfactory.
