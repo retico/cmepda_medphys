@@ -1,3 +1,6 @@
+% SPDX-License-Identifier: EUPL-1.2
+% Copyright 2023 Istituto Nazionale di Fisica Nucleare)
+%
 %% Script to run the mass_segment function on all pgm files of a directory
 % starting from the dirname/image.pgm the mass_segment function will generate
 % the output in the dirname/Im_segmented:

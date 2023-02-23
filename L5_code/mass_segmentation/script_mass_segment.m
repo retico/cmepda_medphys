@@ -1,3 +1,6 @@
+% SPDX-License-Identifier: EUPL-1.2
+% Copyright 2023 Istituto Nazionale di Fisica Nucleare)
+%
 % This example shows how to set up an edge-based mammographic mass segmentation
 % algorithm.
 % It identifies a mass in a mammogram by exploting the variance of pixel 

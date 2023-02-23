@@ -14,6 +14,9 @@ function [mass_mask, im_resized]=mass_segment(fileID, varargin)
 % P Delogu, ME Fantacci, P Kasae, A Retico,
 % Computers in Biology and Medicine 37 (2007) 1479 – 1491]
 %
+% SPDX-License-Identifier: EUPL-1.2
+% Copyright 2023 Istituto Nazionale di Fisica Nucleare)
+%
 %
 % The main steps are highlighted in different scrip sessions
 %
