@@ -32,13 +32,6 @@ moving=IM2;
 %% visualize coregistration results
 
 figure
-imshowpair(fixed,movingReg)
-figure
-imshowpair(fixed,movingReg,'montage')
-figure
-imshowpair(fixed,movingReg,'diff'), colorbar
-
-figure
 imshowpair(moving,movingReg)
 figure
 imshowpair(moving,movingReg,'montage')
@@ -61,7 +54,10 @@ imagesc(Dj); colorbar
 subplot(1,3,3)
 imagesc(D2); colorbar 
 
-%% The displacement vectors at each pixel location map from the fixed image grid to a corresponding location in the moving image
+%% The displacement vectors at each pixel location map from 
+% the fixed image grid to a corresponding location in the moving 
+% image
+
 figure
 imshowpair(fixed,Di,'montage')
 figure
