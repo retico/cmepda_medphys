@@ -8,7 +8,8 @@
 %
 % Sample DICOM images are available at
 % <https://pandora.infn.it/public/cmepda/DATASETS/IMAGES/DICOM_Examples/ INFN Pandora>
-% or on drive <https://drive.google.com/drive/folders/1YqK7ZkM-P2IrqfD7Pj-SCmjz-GWd_1-Y?usp=sharing Google drive folder>
+% or on drive
+% <https://drive.google.com/drive/folders/1r3BW9clkwoS-Sq-enGGBL3LyC1gszSh7?usp=drive_link>
 % 
 %% Clear the workspace, close all figures, search for functions to use  
 % Before you start a new analysis, clear the workspace and close all
@@ -57,6 +58,7 @@ size(Im)
 
 %% Display a 2D image
 imagesc(Im)
+colorbar
 colormap(gray)
 
 %% Plot plofiles, etc.
