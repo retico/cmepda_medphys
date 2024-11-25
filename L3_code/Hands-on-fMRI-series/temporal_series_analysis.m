@@ -7,7 +7,7 @@
 % http://preprocessed-connectomes-project.org/abide/
 
 % The dataset includes three files:
-% - table_phen_NYU.csv withe the ID of the 124 subjects (59 subjects with ASD and 65 control subjects) with information about the diagnostic group (1 for ASD, 2 for control), age at scan, the Full Scale IQ score  (FIQ), and the SEX (1 for males, only males are present in this dataset);  
+% - table_phen_NYU.csv with the ID of the 124 subjects (59 subjects with ASD and 65 control subjects) with information about the diagnostic group (1 for ASD, 2 for control), age at scan, the Full Scale IQ score (FIQ), and the SEX (1 for males, only males are present in this dataset);  
 % - data_struct.mat, a MATLAB struct containing the 110 time series for each subjects 
 % - legend_series.mat, a MATLAB table containing the names of the 110 ROIs of the HO atlas and their correspondence to the Mesulam functional areas.
 % - Each time point in the series has a duration of 2 seconds.
@@ -18,9 +18,11 @@ clc
 
 %% load the data
 
-load data_struct
-load legend_series.mat
-T_phen = readtable('table_phen_NYU.csv');
+data_dir = "/Users/retico/Desktop/CMEPDA/DATASETS/FEATURES/Brain_fMRI_HOseries_ABIDE/";
+
+load(strcat(data_dir, "data_struct"))
+load(strcat(data_dir,"legend_series.mat"))
+T_phen = readtable(strcat(data_dir, 'table_phen_NYU.csv'));
 
 vt = 2; % each timepoint corresponds to 2 seconds
 
@@ -30,13 +32,18 @@ i_sbj = 1; % we plot time series for the first subject
 
 
 N_ROIs = size(data(i_sbj).t_series,2);
+time_points = size(data(i_sbj).t_series(:,1),1);
+x = 1:time_points;
+x = x*vt;
 
 label_all=[];
-x = 1:176;
 figure;
-for i = 1:N_ROIs
+for i = 1: 10 %N_ROIs
+    
     plot(x, data(i_sbj).t_series(:,i))
     label_all = [label_all; string(legend_series{i,3})];
+    xlabel('t (s)')
+    ylabel('bold signal (a.u.)')
     hold on
 end
 legend(label_all)
@@ -53,32 +60,39 @@ for i = 1:N_ROIs
 end
 
  figure; imagesc(FuncConn)
+ colorbar
 %% Identify and plot the pair of time series with the highest FC value
 
-[R,C] = find(FuncConn == max(FuncConn(:)));
-string(legend_series{R,3})
-string(legend_series{C,3})
+[i_max, j_max] = find(FuncConn == max(FuncConn(:)));
+
+pair = [i_max, j_max]; 
+
+string(legend_series{pair(1),3})
+string(legend_series{pair(2),3})
 
 label_all=[];
-x = 1:176;
+
 figure;
-for i = [R, C]
+for i = pair(:)
     plot(x, data(i_sbj).t_series(:,i))
     label_all = [label_all; string(legend_series{i,3})];
     hold on
+    %print(string(legend_series{i,3}))
 end
 legend(label_all)
+colorbar
+
 
 %% Identify and plot some pairs of time series with high and positive FC value
 
-[R,C] = find(FuncConn > 0.9*max(FuncConn(:)));
+[i_set, j_set] = find(FuncConn > 0.9*max(FuncConn(:)));
 
-x = 1:176;
+pairs = [i_set, j_set]; 
 
-for i_pairs= 1:size(R,1)
+for i_pairs= 1:size(pairs,1)
     label_all=[];
     figure;
-    for i = [R(i_pairs), C(i_pairs)]
+    for i = [pairs(i_pairs,1), pairs(i_pairs,2)]
         plot(x, data(i_sbj).t_series(:,i))
         label_all = [label_all; string(legend_series{i,3})];
         hold on
@@ -87,21 +101,70 @@ for i_pairs= 1:size(R,1)
 end
 
 
-%% Identify and plot some pairs of time series with high and negative 
-% FC value (i.e. anticorrelated)
 
-[R,C] = find(FuncConn < 0.9*min(FuncConn(:)));
+%% write a function which makes the plots of the selected tipe series
 
-for i_pairs= 1:size(R,1)
+function plot_pair_series(data,i_sbj, x, pairs, legend_series)
+%plots two time series 
+
+for i_pairs= 1:size(pairs,1)
     label_all=[];
     figure;
-    for i = [R(i_pairs), C(i_pairs)]
+    for i = [pairs(i_pairs,1), pairs(i_pairs,2)]
         plot(x, data(i_sbj).t_series(:,i))
-        label_all = [label_all; string(legend_series{i,3})];
+        label_all = [label_all; string(legend_series{i})];
         hold on
     end
     legend(label_all)
+    xlabel('t (s)')
+    ylabel('bold signal (a.u.)')
+    hold on
 end
+
+
+end
+
+%% Identify and plot the pair of time series with the highest FC value (as before, but now using the function)
+
+[i_max, j_max] = find(FuncConn == max(FuncConn(:)));
+pair = [i_max, j_max]; 
+
+plot_pair_series(data,i_sbj, x, pair, legend_series{:,3})
+
+
+%% Identify and plot some pairs of time series with high and positive FC value
+
+[i_set, j_set] = find(FuncConn > 0.9*max(FuncConn(:)));
+pairs = [i_set, j_set]; 
+
+plot_pair_series(data,i_sbj, x, pairs, legend_series{:,3})
+
+
+%% Identify and plot the pairs of time series with the highest and negative FC value (i.e. anticorrelated)
+
+[i_min,j_min] = find(FuncConn == min(FuncConn(:)));
+pair = [i_min, j_min]; 
+
+plot_pair_series(data,i_sbj, x, pair, legend_series{:,3})
+
+
+%% Identify and plot some pairs of anticorrelated time series
+
+[i_min,j_min] = find(FuncConn < 0.9*min(FuncConn(:)));
+pair = [i_min, j_min]; 
+
+plot_pair_series(data,i_sbj, x, pair, legend_series{:,3})
+
+
+
+%% Identify and plot some pairs of uncorrelated time series (FC value close to 0)
+
+[i_set, j_set]  = find((abs(FuncConn) < 0.0001)&(abs(FuncConn) ~= 0));
+
+pairs = [i_set, j_set]; 
+
+plot_pair_series(data,i_sbj, x, pair, legend_series{:,3})
+
 
 
 
@@ -152,20 +215,19 @@ colorbar
 
 %% Plot the most correlated areas
 
-[R,C] = find(FuncConn_M == max(FuncConn_M(:)));
-string(legend_series{R,3})
-string(legend_series{C,3})
-
+[i_max, j_max]  = find(FuncConn_M == max(FuncConn_M(:)));
 
 label_all=[];
-x = 1:176;
+
 figure;
-for i = [R, C]
+for i = [i_max, j_max]
     plot(x, series_M(i).mean)
     label_all = [label_all; string(areas_M{i})];
     hold on
 end
 legend(label_all)
+
+
 
 %% Identification of the average signals of the 6 Mesulam areas for:
 % 1) wavelet time-serie analysis
