@@ -1,5 +1,5 @@
 function shape = diamond(r,c,rad,M)
-% Returns an image MxM with a diamond of size rad.
+% diamond(r,c,rad,M) Returns an image MxM with a diamond of size rad centered in [r,c].
 % Input arguments: 
 % the row (r) and column (c) image position, 
 % the object size (rad), 
