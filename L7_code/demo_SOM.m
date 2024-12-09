@@ -37,7 +37,7 @@ clear
 
 %% Read the ABIDE data
 
-filename='../DATASETS/FEATURES/Brain_MRI_FS_ABIDE/FS_features_ABIDE_males_someGlobals.csv';
+filename='/Users/retico/Desktop/CMEPDA/DATASETS/FEATURES/Brain_MRI_FS_ABIDE/FS_features_ABIDE_males_someGlobals.csv';
 data=readtable(filename, 'ReadRowNames', true);
 
 % and define the array of features
