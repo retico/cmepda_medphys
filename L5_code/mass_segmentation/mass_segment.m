@@ -1,226 +1,283 @@
-function [mass_mask, im_resized]=mass_segment(fileID, varargin)
-% This funtion segment a mass in a mammogram by exploting
-% the variance of pixel intensities across the mass border.
-% Arguments: fileID is the image file containing the mass
-% Optional arguments are
-%    [smooth_factor,scale_factor,size_nhood_variance, NL]
-% default values are provided as
-% smooth_factor= 8;       % used in sec 3
-% scale_factor= 8;        % used in sec 4
-% size_nhood_variance=5;  % used in sec 6.3
-% NL=32;                  % used in sec 6.3
+function [mass_mask, im_resized] = mass_segment(file_path, varargin)
+% MASS_SEGMENT  Semi-automated segmentation of a mass lesion in a mammogram.
 %
-% This analysis pipeline is a simplified version of the scripts used for the work:
-% P Delogu, ME Fantacci, P Kasae, A Retico,
-% Computers in Biology and Medicine 37 (2007) 1479 – 1491]
+%   [MASS_MASK, IM_RESIZED] = MASS_SEGMENT(FILE_PATH) segments the mass
+%   lesion contained in the PGM image at FILE_PATH using default parameters.
+%
+%   [MASS_MASK, IM_RESIZED] = MASS_SEGMENT(FILE_PATH, SMOOTH_FACTOR,
+%       SCALE_FACTOR, NHOOD_SIZE, N_LINES) allows overriding the four
+%       optional tuning parameters (see below).
+%
+%   Input arguments
+%   ---------------
+%   FILE_PATH     : Full path to the input PGM image file.
+%   SMOOTH_FACTOR : Side length (pixels) of the square averaging kernel
+%                   used to smooth the image before resizing (default: 8).
+%   SCALE_FACTOR  : Down-scaling factor applied after smoothing
+%                   (default: 8).  The image is resized to 1/SCALE_FACTOR
+%                   of its original dimensions.
+%   NHOOD_SIZE    : Side length of the square neighbourhood used by
+%                   STDFILT when computing local intensity standard
+%                   deviation (default: 5).
+%   N_LINES       : Number of radial lines cast from the lesion centre to
+%                   locate the mass border (default: 32).
+%
+%   Output arguments
+%   ----------------
+%   MASS_MASK  : Binary image (logical) marking the segmented lesion.
+%   IM_RESIZED : Smoothed and down-scaled version of the input image
+%                (double, normalised to [0 1]).
+%
+%   Side effects
+%   ------------
+%   Two output files are written inside a sub-folder called Im_segmented/
+%   in the same directory as FILE_PATH:
+%       <name>_resized.pgm   – the pre-processed image (uint8).
+%       <name>_mass_mask.pgm – the binary lesion mask.
+%
+%   Algorithm overview
+%   ------------------
+%   This is a simplified implementation of the segmentation pipeline
+%   described in:
+%       P. Delogu, M.E. Fantacci, P. Kasae, A. Retico,
+%       "Characterization of mammographic masses using a gradient-based
+%       segmentation algorithm and a neural classifier,"
+%       Computers in Biology and Medicine, 37(10):1479-1491, 2007.
+%
+%   The pipeline consists of the following numbered stages (matching the
+%   section comments below):
+%       1. Read the image and set up output paths.
+%       2. Parse / validate optional parameters.
+%       3. Smooth the image with a box filter.
+%       4. Down-scale the smoothed image.
+%       5. Normalise pixel intensities to [0, 1].
+%       6. Interactive ROI selection and radial-line segmentation.
+%       7. Display the final result.
+%       8. Write the output files.
+%
+%   Notes
+%   -----
+%   * The Mapping Toolbox function INTERPM is required (used inside
+%     MAX_VAR_POINTS_INTERP to densify the rough border polygon).
+%   * The function relies on two helper functions that must be on the
+%     MATLAB path: DRAW_RADIAL_LINES and MAX_VAR_POINTS_INTERP.
 %
 % SPDX-License-Identifier: EUPL-1.2
-% Copyright 2023 Istituto Nazionale di Fisica Nucleare)
-%
-%
-% The main steps are highlighted in different scrip sessions
-%
-% Additional info:
-% The mapping toolbox is required (interpm is used in the function
-% max_var_points_interp.m)
-%
+% Copyright 2023 Istituto Nazionale di Fisica Nucleare
 
-numvarargs = length(varargin);
-if numvarargs > 4
-    error('myfuns:mass_segment:TooManyInputs', ...
-        'requires at most 4 optional inputs');
+% -------------------------------------------------------------------------
+%% 1. Parse optional input arguments
+% -------------------------------------------------------------------------
+
+MAX_OPTIONAL_ARGS = 4;
+if length(varargin) > MAX_OPTIONAL_ARGS
+    error('mass_segment:TooManyInputs', ...
+          'At most %d optional arguments are accepted.', MAX_OPTIONAL_ARGS);
 end
 
-% set defaults for optional inputs (See Sec 2 below)
-optargs = {8 8 5 32};
-optargs(1:numvarargs) = varargin;
-% place optional args in memorable variable names
-[smooth_factor,scale_factor,size_nhood_variance, NL] = optargs{:};
+% Default parameter values
+defaults = {8, 8, 5, 32};
+defaults(1:length(varargin)) = varargin;
+[smooth_factor, scale_factor, nhood_size, n_lines] = defaults{:};
 
-%% 1.1 Reading the input file and
+% -------------------------------------------------------------------------
+%% 2. Read the input image and set up output paths
+% -------------------------------------------------------------------------
 
-%fileID='0016p1_2_1.pgm';
-%fileID='0025p1_4_1.pgm';  % try with another mass
-%figure; imshow(fileID)
+image_raw = imread(file_path);
 
-image = imread(fileID);
+[file_dir, file_name, file_ext] = fileparts(file_path);
+out_dir = fullfile(file_dir, 'Im_segmented');
 
-%% 1.2 defining the names of the output file
-
-[filepath,name,ext] = fileparts(fileID);
-fileOUTpath=fullfile(filepath,'Im_segmented/');
-
-if ~exist(fileOUTpath, 'dir')
-    mkdir(fileOUTpath);
+if ~exist(out_dir, 'dir')
+    mkdir(out_dir);
 end
 
-fileIDout=strcat(fileOUTpath,name,'_resized',ext);
-fileIDout_mask=strcat(fileOUTpath,name,'_mass_mask',ext);
+out_path_resized = fullfile(out_dir, [file_name '_resized' file_ext]);
+out_path_mask    = fullfile(out_dir, [file_name '_mass_mask' file_ext]);
 
-%% 2. Place here the free analysis parameters (to be optimized possibly on the entire dataset)
+% -------------------------------------------------------------------------
+%% 3. Smooth the image with a box (mean) filter
+% -------------------------------------------------------------------------
+% A normalised box kernel of side SMOOTH_FACTOR is convolved with the
+% image. Working with doubles from this point onwards avoids integer
+% overflow and precision loss in later steps.
 
-% smooth_factor= 8;       % used in sec 3
-% scale_factor= 8;        % used in sec 4
-% size_nhood_variance=5;  % used in sec 6.3
-% NL=32;                  % used in sec 6.3
+box_kernel = ones(smooth_factor, smooth_factor) / smooth_factor^2;
+im_smooth  = conv2(double(image_raw), box_kernel);
 
-%% 3. Image Smoothing
-% smoothing factor is defined in the first section of the script
+% -------------------------------------------------------------------------
+%% 4. Down-scale the smoothed image
+% -------------------------------------------------------------------------
+% IMRESIZE uses bicubic interpolation by default.
 
-mask=ones(smooth_factor,smooth_factor)/smooth_factor^2;
-im_conv=conv2(mask,image); %  we work with doubles from here
-%figure,imagesc(im_conv),colormap(gray),title('smoothed')
+im_resized = imresize(im_smooth, 1 / scale_factor);
 
-%% 4. Image Resizing
-% resizing factor is defined in the first section of the script
+% -------------------------------------------------------------------------
+%% 5. Normalise pixel intensities to [0, 1]
+% -------------------------------------------------------------------------
 
-im_resized=imresize(im_conv,1/scale_factor);
-% By default, imresize uses bicubic interpolation.
-%figure,imagesc(im_resized),colormap(gray),title('resized')
+im_norm = im_resized / max(im_resized(:));
 
-%% 5. Intensity normalization
-% the image intensity is normalized to image maximum
+% -------------------------------------------------------------------------
+%% 6. Segment the mass lesion
+% -------------------------------------------------------------------------
 
-im_norm = im_resized/max(im_resized(:));
-%figure,imagesc(im_norm),colormap(gray),title('normalized image ')
+% -- 6.1  User draws a rectangle around the lesion -----------------------
 
-%% 6 SEGMENTATION of mass lesion
-% 6.1 An expert selects a rectangle enclosing the lesion
-% Waiting that user choose the ROI by mouse
-figure,imagesc(im_norm),colormap(gray)
-title('Please select a rectangle containing the mass with the mouse ')
+figure;
+imagesc(im_norm);
+colormap(gray);
+title('Draw a rectangle enclosing the mass, then release the mouse button');
+
 k = waitforbuttonpress;
-%  waitforbuttonpress blocks statements from executing until the user has 
-% clicked a mouse button or pressed a key in the current figure.
 
-if k==0
-    point1 = get(gca,'CurrentPoint');    % button down detected
-    rbbox;  % Create rubberband box for area selection starting at 'CurrentPoint'
-    point2 = get(gca,'CurrentPoint');    % button up detected
+if k == 1
+    error('mass_segment:KeyboardInput', ...
+          'Please use the mouse to draw the ROI, not the keyboard.');
+end
+
+pt1 = get(gca, 'CurrentPoint');   % corner recorded at mouse-button-down
+rbbox;                             % interactive rubber-band rectangle
+pt2 = get(gca, 'CurrentPoint');   % corner recorded at mouse-button-up
+
+% -- 6.2  Define the ROI and find the segmentation seed point ------------
+
+% Convert floating-point axes coordinates to integer pixel indices.
+row1 = round(pt1(1, 2));   col1 = round(pt1(1, 1));
+row2 = round(pt2(1, 2));   col2 = round(pt2(1, 1));
+
+% Ensure row1 <= row2 and col1 <= col2 regardless of drag direction.
+row_lo = min(row1, row2);  row_hi = max(row1, row2);
+col_lo = min(col1, col2);  col_hi = max(col1, col2);
+
+% Clamp indices to valid image dimensions.
+[n_rows, n_cols] = size(im_norm);
+row_lo = max(row_lo, 1);  row_hi = min(row_hi, n_rows);
+col_lo = max(col_lo, 1);  col_hi = min(col_hi, n_cols);
+
+% Build an ROI image that is zero outside the selected rectangle.
+roi = zeros(size(im_norm));
+roi(row_lo:row_hi, col_lo:col_hi) = im_norm(row_lo:row_hi, col_lo:col_hi);
+
+% Locate the brightest pixel inside the ROI.
+[row_max, col_max] = find(roi == max(roi(:)));
+row_max = row_max(1);
+col_max = col_max(1);
+
+% Use the rectangle centre instead of the intensity maximum when the
+% maximum is more than 4/5 of the half-diagonal away from the centre,
+% because extreme outliers are unreliable seed points.
+roi_centre_row = row_lo + ceil((row_hi - row_lo) / 2);
+roi_centre_col = col_lo + ceil((col_hi - col_lo) / 2);
+
+half_height = (row_hi - row_lo) / 2;
+half_width  = (col_hi - col_lo) / 2;
+
+if abs(row_max - roi_centre_row) > 4/5 * half_height || ...
+   abs(col_max - roi_centre_col) > 4/5 * half_width
+    seed_row = roi_centre_row;
+    seed_col = roi_centre_col;
 else
-    if k==1
-        error('Please use mouse not keyboard')
-    else
-        error('Please choose a rectangle with mouse,  containing mass')
-    end
-    
+    seed_row = row_max;
+    seed_col = col_max;
 end
 
-%% 6.2 defing the ROI enclosing the rectangle and the center point where to start the segmentation
+% Overlay the ROI bounding box and seed point for visual confirmation.
+peak_intensity = max(roi(:));
+im_display = im_norm;
+im_display(row_lo-1:row_hi+1, col_lo-1)   = peak_intensity;  % left edge
+im_display(row_lo-1:row_hi+1, col_hi+1)   = peak_intensity;  % right edge
+im_display(row_lo-1, col_lo-1:col_hi+1)   = peak_intensity;  % top edge
+im_display(row_hi+1, col_lo-1:col_hi+1)   = peak_intensity;  % bottom edge
+im_display(seed_row, seed_col)             = 0;               % seed point
 
-i1 = round(point1(1,2));
-j1 = round(point1(1,1));
+figure;
+imagesc(im_display);
+colormap(gray);
+title('Selected ROI (white box) and seed point (black dot)');
 
-i2 = round(point2(1,2));
-j2 = round(point2(1,1));
+% -- 6.3  Cast radial lines from the seed to estimate the mass border ----
 
-ROI=zeros(size(im_norm));
-ROI(i1:i2,j1:j2)=im_norm(i1:i2,j1:j2);
+fprintf('Estimating mass border...\n');
 
-maximum=max(max(ROI));
-[i_max, j_max]=find(ROI==max(ROI(:)));
+% Radial-line length: half the diagonal of the selected rectangle.
+R = ceil(sqrt((row_hi - row_lo)^2 + (col_hi - col_lo)^2) / 2);
 
-% if the point with maximum intensity is too far away from the ROI center, we
-% chose the center of the rectangle as starting point
-if((abs(i_max-(i2-i1)/2)>4/5*(i1+(i2-i1)/2))||(abs(j_max-(j2-j1)/2)>4/5*(j1+(j2-j1)/2)))
-    icenter=i1+ceil((i2-i1)/2);
-    jcenter=j1+ceil((j2-j1)/2);
-else
-    icenter=i_max;
-    jcenter=j_max;
+seed_point    = [seed_row, seed_col];
+nhood_kernel  = ones(nhood_size);
+
+ray_masks = draw_radial_lines(roi, seed_point, R, n_lines);
+
+% -- 6.4  Find maximum-variance points and build a rough border ----------
+
+fprintf('  Building rough border...\n');
+
+rough_border    = max_var_points_interp(im_norm, roi, ray_masks, n_lines, nhood_kernel);
+rough_mass_fill = imfill(rough_border);
+
+figure; imagesc(rough_border);    colormap(gray); title('Rough border');
+figure; imagesc(rough_mass_fill); colormap(gray); title('Rough mass (filled)');
+
+fprintf('  Rough border complete.\n');
+
+% -- 6.5  Refine the segmentation by re-running from each border point ---
+
+fprintf('  Refining segmentation...\n');
+
+[border_rows, border_cols] = find(rough_border);
+n_border_points = size(border_rows, 1);
+
+% Reduced radius for refinement passes (1/5 of the original R).
+R_refined = round(R / 5);
+
+% Pre-allocate a 3-D array to accumulate all refinement masks.
+refined_masks = zeros([size(im_norm), n_border_points]);
+
+for ib = 1:n_border_points
+    bp_seed  = [border_rows(ib), border_cols(ib)];
+    ray_masks_bp  = draw_radial_lines(roi, bp_seed, R_refined, n_lines);
+    rough_border_bp = max_var_points_interp(im_norm, roi, ray_masks_bp, n_lines, nhood_kernel);
+    refined_masks(:, :, ib) = imfill(rough_border_bp);
 end
 
-% we display a rectangle around the ROI
-in_norm_ROIview=im_norm;
-in_norm_ROIview(i1-1:i2+1,j1-1)=maximum;
-in_norm_ROIview(i1-1:i2+1,j2+1)=maximum;
-in_norm_ROIview(i1-1,j1-1:j2+1)=maximum;
-in_norm_ROIview(i2+1,j1-1:j2+1)=maximum;
+% Combine all partial masks: sum them, add the initial fill, then binarise.
+combined_mask = rough_mass_fill + sum(refined_masks, 3);
+mass_mask     = imbinarize(combined_mask);
 
-in_norm_ROIview(icenter,jcenter)=0;
-figure,imagesc(in_norm_ROIview),colormap(gray),title('ROI box and center point ')
+figure; imagesc(mass_mask); colormap(gray); title('Combined mass mask');
+fprintf('  Refinement complete.\n');
 
-%% 6.3 Throwing radial lines starting from center for estimating mass
+% -- 6.6  Remove regions disconnected from the seed point ----------------
 
-disp('Estimating mass...');
+fprintf('  Removing disconnected regions...\n');
 
-% The lenght of the radial lines is defined in relation to the ROI size
-R=ceil(sqrt((i2-i1)^2+(j2-j1)^2)/2);
+[label_map, ~] = bwlabel(mass_mask, 8);
+seed_label      = label_map(seed_row, seed_col);
+mass_mask(label_map ~= seed_label) = 0;
 
-center=[icenter jcenter];
-nhood=ones(size_nhood_variance);
+fprintf('  Cleanup complete.\n');
 
-% The number of radiallines (NL) is defined at the beginning of the script
-Ray_masks=draw_radial_lines(ROI,center,R,NL);
+% -------------------------------------------------------------------------
+%% 7. Display the final segmentation result
+% -------------------------------------------------------------------------
 
-%% 6.4 Find max variance points on radial lines and segment mass
+mass_overlay = mass_mask .* im_norm;
+background   = im_norm - mass_overlay;
 
-disp('     Estimating rough mass... ');
+figure;
+subplot(1, 2, 1);
+imagesc(mass_overlay); colormap(gray); title('Segmented mass'); axis square;
+subplot(1, 2, 2);
+imagesc(background);   colormap(gray); title('Surrounding tissue'); axis square;
 
-roughborder=max_var_points_interp(im_norm,ROI,Ray_masks,NL,nhood);
-segmented_mass=imfill(roughborder);
+% -------------------------------------------------------------------------
+%% 8. Write output files
+% -------------------------------------------------------------------------
 
-figure,imagesc(segmented_mass),colormap(gray),title('rough mass')
-figure,imagesc(roughborder),colormap(gray),title('rough border')
+fprintf('Writing output files to %s ...\n', out_dir);
 
-disp('     Estimating rough mass... done!');
+imwrite(mass_mask,           out_path_mask);
+imwrite(uint8(im_resized),   out_path_resized);
 
-
-%% 6.5 Refining segmentation results
-% the same segmentation procedure is repeated for each pixel of the rough
-% border to find mass branches
-
-disp('     Refining segmentation... ');
-
-[c1, c2]=find(roughborder);
-center=[c1 c2];
-
-% The lenght of the radial lines in the segmentation refinement is reduced
-% (and it is defined as a fraction of the R free parameter)
-
-R_red=round(R/5);
-
-MassMasks=[];
-for ib=1:size(center,1)
-    Ray_masks=draw_radial_lines(ROI,[center(ib,1) center(ib,2)],R_red,NL);
-    roughborder1=max_var_points_interp(im_norm,ROI,Ray_masks,NL,nhood);
-    segmented_mass1=imfill(roughborder1);
-    MassMasks=cat(3,MassMasks,segmented_mass1);
-end
-
-% The additionally segmented masks are summed together and added to the
-% segmented_mass. Then, the resulting image is binarized
-MM=segmented_mass+sum(MassMasks,3);
-mass_mask=imbinarize(MM);
-figure,imagesc(mass_mask),colormap(gray),title('sum mass')
-disp('     Refining segmentation... done!');
-
-%% 6.6 Cleaning disconnected parts
-disp('     Cleaning disconnected regions...');
-[label,num] = bwlabel(mass_mask,8);
-L=label(icenter,jcenter);
-mass_mask(label~=L)=0;
-disp('     Cleaning disconnected regions... done!');
-
-
-%% 7 Displaying the result
-
-mass_only=mass_mask.*im_norm;
-figure,
-subplot(1,2,1)
-imagesc(mass_only),colormap(gray),title('segmented mass '), axis square
-rest=im_norm-mass_only;
-subplot(1,2,2)
-imagesc(rest),colormap(gray),title('rest '), axis square
-
-
-%% 8 Write the output files
-
-disp('Writing the output files');
-
-imwrite(mass_mask, fileIDout_mask);
-imwrite(uint8(im_resized), fileIDout);
-
-disp('... done!');
-
-
+fprintf('Done.\n');

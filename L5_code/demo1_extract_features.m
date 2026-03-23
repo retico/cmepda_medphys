@@ -1,139 +1,191 @@
-% This demo shows how to extract intensity and shape based features form
-% segmented masses in mammography
-% Let us suppose that we have already segmented a number of masses via the
-% run_segmentation.m script
+% DEMO1_EXTRACT_FEATURES
 %
-% If we have segmented the masses and saved the segmentation output in 
-% workspace variable, we can load those files and start from sec. 3.
-
-clear
-close all
-
-%% 1. Specify the directory where to find the segmented masses
-
-DB_path='../DATASETS/IMAGES/Mammography_masses/small_sample_Im_segmented_ref/'
-
-% It we want to run this script from the command line without editing it 
-% we can ask the used to input the DB_path
+% DESCRIPTION
+%   Demonstrates how to extract intensity- and shape-based features from
+%   previously segmented mammographic mass lesions, and store the results
+%   in a labelled table ready for classification.
 %
-% prompt = 'Please, type the path of the folder containing the segmented images to process: ...'
-% DB_path = input(prompt,'s')
+%   The script assumes that the segmentation pipeline (run_segmentation.m /
+%   mass_segment.m) has already been run and that the output folder
+%   contains pairs of files named:
+%       <caseID>_resized.pgm    – smoothed/down-scaled original image
+%       <caseID>_mass_mask.pgm  – binary lesion mask
 %
+%   Naming convention used by the sample dataset:
+%       *_1_resized.pgm  –  malignant mass  (label = 1)
+%       *_2_resized.pgm  –  benign mass     (label = 0)
+%
+% OUTPUT
+%   table_features_masses_1mal_0ben.xlsx – feature table written to the
+%   current working directory.
+%
+% DEPENDENCIES
+%   Image Processing Toolbox (REGIONPROPS, IMBINARIZE, IMAGESC).
+%
+% SPDX-License-Identifier: EUPL-1.2
+% Copyright 2023 Istituto Nazionale di Fisica Nucleare
 
-%% 2. Read the files containing the images with reduced size and the mass 
-% masks and concatenate the images in single variables contining all cases,
-% e.g. Im_all_orig_reduced_size contains all masses with redused size
-% and Im_all_segmented containes all masks 
+clear;
+close all;
 
-Im_all_segmented=[];
-Im_all_orig_reduced_size=[];
+% -------------------------------------------------------------------------
+%% 1. Specify the directory containing the segmented mass images
+% -------------------------------------------------------------------------
 
-files=dir(strcat(DB_path,'*_resized.pgm'));
-files_seg=dir(strcat(DB_path,'*_mass_mask.pgm'));
+DB_path = '../DATASETS/IMAGES/Mammography_masses/small_sample_Im_segmented_ref/';
 
-for i=1:size(files,1)
-    Im_orig_reduced_size = imread(strcat(DB_path,files(i).name));
-    Im_segmented=imread(strcat(DB_path,files_seg(i).name));
-    Im_all_orig_reduced_size=cat(3,Im_all_orig_reduced_size,Im_orig_reduced_size);
-    Im_all_segmented=cat(3,Im_all_segmented,Im_segmented);
-end
-clear Im_orig_reduced_size Im_segmented
+% To supply the path interactively from the command line instead, replace
+% the line above with:
+%   DB_path = input('Path to folder containing segmented images: ', 's');
 
-%% 3. Visualization of the segmentations
-% We visualize a maximum number Nv of masses and their segmentation result
-% in a single figure
-% If the number of images in the dataset is greater than Nv we randomly
-% select Nv masses to show
+% -------------------------------------------------------------------------
+%% 2. Load all resized images and their corresponding masks
+% -------------------------------------------------------------------------
+% Files are discovered with DIR and read in matched pairs.  The two stacks
+% are built as 3-D arrays: Im_stack_orig(:,:,k) and Im_stack_mask(:,:,k)
+% both refer to the k-th case.
 
-Nv=4; %max number of image to visualize
+files_orig = dir(fullfile(DB_path, '*_resized.pgm'));
+files_mask = dir(fullfile(DB_path, '*_mass_mask.pgm'));
 
-figure; colormap(gray)
-if(size(files,1)>Nv)
-    perm = randperm(size(files,1),Nv);
-    for i = 1:Nv
-        subplot(2,4,i);
-        imagesc(Im_all_orig_reduced_size(:,:,perm(i)));
-        title(files(perm(i)).name)
-        subplot(2,4,i+Nv);
-        imagesc(Im_all_segmented(:,:,perm(i)));
-    end
-else
-    for i = 1:Nv
-        subplot(2,4,i);
-        imagesc(Im_all_orig_reduced_size(:,:,i));
-        title(files(i).name)
-        subplot(2,4,i+Nv);
-        imagesc(Im_all_segmented(:,:,i));
-        
-    end
+n_cases = numel(files_orig);
+
+if n_cases == 0
+    error('demo1_extract_features:noFiles', ...
+          'No *_resized.pgm files found in:\n  %s\nCheck DB_path.', DB_path);
 end
 
-%% 3. Feature extraction
-% - Binarize the mask (which is a uint8 image), and mask the segmented mass
-% - Extract properties with regionprops. 
-% - Store the features in a Matlab Table
-
-statsTabAll=[];
-
-for i=1:size(files,1)
-    BW_image=imbinarize(Im_all_segmented(:,:,i));
-    Segm_image=Im_all_orig_reduced_size(:,:,i);
-    Segm_image(~BW_image)=0;
-    
-    %    figure; imshow(Segm_image);
-    %    figure; imshow(BW_image);
-    
-    % Compute image features with regionprops:
-    % stats=regionprops(BW_image, 'All')
-    % If you do not specify the properties argument, or if you specify 
-    % 'basic', then regionprops returns the 'Area', 'Centroid', and 
-    % 'BoundingBox' measurements.
-    % If you specify 'all', regionprops computes all the shape measurements 
-    % and, for grayscale images (to be provided as additional field), 
-    % the pixel value measurements as well.
-    
-    %statsTab=regionprops('table', BW_image, 'all'); % only shape features
-    statsTab=regionprops('table', BW_image, Segm_image, 'all'); % also intensity-based features
-    
-    statsTabAll=[statsTabAll ;statsTab];
-    
-    % We specify the table RowNames as the mass filenames
-    statsTabAll.Properties.RowNames{i}=files(i).name;
+if numel(files_mask) ~= n_cases
+    error('demo1_extract_features:fileMismatch', ...
+          'Number of resized images (%d) does not match number of masks (%d).', ...
+          n_cases, numel(files_mask));
 end
 
-clear statsTab
+fprintf('Found %d image/mask pair(s) in %s\n', n_cases, DB_path);
 
-display(statsTabAll)
+% Read the first image to get the common spatial dimensions.
+tmp = imread(fullfile(DB_path, files_orig(1).name));
+[n_rows, n_cols] = size(tmp);
 
-%% 4. Create the column of labels and add it to feature table
+Im_stack_orig = zeros(n_rows, n_cols, n_cases, 'uint8');
+Im_stack_mask = zeros(n_rows, n_cols, n_cases, 'uint8');
 
-for i=1:size(files,1)
-    if(contains(files(i).name,'_1.pgm')||contains(files(i).name,'_1_resized.pgm'))
-        label_mal1_ben0(i)=1;
-    else
-        label_mal1_ben0(i)=0;
-    end
+for k = 1:n_cases
+    Im_stack_orig(:, :, k) = imread(fullfile(DB_path, files_orig(k).name));
+    Im_stack_mask(:, :, k) = imread(fullfile(DB_path, files_mask(k).name));
 end
-Label=categorical(label_mal1_ben0');   % Labels are usually stored as a categorical array
 
-statsTabAll.Label=Label;
+% -------------------------------------------------------------------------
+%% 3. Visualise a random subset of the segmentation results
+% -------------------------------------------------------------------------
+% Up to N_DISPLAY cases are shown: the original image in the top row and
+% the corresponding mask in the bottom row.
 
-display(statsTabAll.Properties.VariableNames')
+N_DISPLAY = 4;   % Maximum number of cases to show in the figure
 
-%% 5. Create a Table of features for classification
-% Select a number of interesting features to consider for a classification 
-% problem, i.e. containing some interesting variables and the label for
-% each case, e.g. we can select a set of decriptive features and the Labels:
-% vars = {'Area','MajorAxisLength','MinorAxisLength','Eccentricity','ConvexArea',...
-%    'Circularity','EquivDiameter','Solidity','Extent','Perimeter','Label'};  %
-%    only shape
+n_show  = min(N_DISPLAY, n_cases);
+indices = randperm(n_cases, n_show);   % random selection (no repetition)
 
-vars = {'MeanIntensity','MaxIntensity','MinIntensity','Area','MajorAxisLength','MinorAxisLength','Eccentricity','ConvexArea',...
-    'Circularity','EquivDiameter','Solidity','Extent','Perimeter','Label'};
+figure;
+colormap(gray);
+sgtitle('Segmentation results (top: resized image, bottom: mask)');
 
-statsTabAll_classification=statsTabAll(:,vars);
-display(statsTabAll_classification)
+for i = 1:n_show
+    k = indices(i);
 
-%% 6. Store the table ad a xlsx file
+    subplot(2, n_show, i);
+    imagesc(Im_stack_orig(:, :, k));
+    axis image off;
+    title(files_orig(k).name, 'Interpreter', 'none', 'FontSize', 7);
 
-writetable(statsTabAll_classification,'table_features_masses_1mal_0ben.xlsx','WriteRowNames',true);
+    subplot(2, n_show, i + n_show);
+    imagesc(Im_stack_mask(:, :, k));
+    axis image off;
+end
+
+% -------------------------------------------------------------------------
+%% 4. Extract intensity and shape features with REGIONPROPS
+% -------------------------------------------------------------------------
+% For each case:
+%   - binarise the uint8 mask,
+%   - zero-out pixels outside the mask in the original image,
+%   - call REGIONPROPS to compute all available measurements,
+%   - accumulate rows into a single table with case filenames as row names.
+%
+% REGIONPROPS is called with both the binary mask AND the grayscale image
+% so that intensity-based metrics (MeanIntensity, MaxIntensity, etc.) are
+% also computed in addition to the shape metrics.
+
+feature_table = table();
+
+for k = 1:n_cases
+
+    % Binarise mask (stored as uint8, but pixels are 0 or 255).
+    bw_mask = imbinarize(Im_stack_mask(:, :, k));
+
+    % Apply mask to the original image.
+    im_masked = Im_stack_orig(:, :, k);
+    im_masked(~bw_mask) = 0;
+
+    % Compute all region properties (shape + intensity).
+    row_table = regionprops('table', bw_mask, im_masked, 'all');
+
+    % Assign the source filename as the row name.
+    row_table.Properties.RowNames = {files_orig(k).name};
+
+    % Append to the accumulated table.
+    feature_table = [feature_table; row_table]; %#ok<AGROW>
+end
+
+disp('Full feature table:');
+disp(feature_table);
+
+% -------------------------------------------------------------------------
+%% 5. Assign class labels
+% -------------------------------------------------------------------------
+% Malignant cases are identified by '_1_resized.pgm' or '_1.pgm' in the
+% filename; all other cases are labelled benign (0).
+% Labels are stored as a categorical array, which is the standard MATLAB
+% format for classification targets.
+
+is_malignant = contains({files_orig.name}', '_1_resized.pgm') | ...
+               contains({files_orig.name}', '_1.pgm');
+
+labels = categorical(double(is_malignant));   % 1 = malignant, 0 = benign
+feature_table.Label = labels;
+
+fprintf('\nClass distribution:\n');
+tabulate(labels);
+
+% -------------------------------------------------------------------------
+%% 6. Select features for classification
+% -------------------------------------------------------------------------
+% Choose a subset of informative features plus the label column.
+% Uncomment the shape-only block and comment out the combined block to
+% restrict features to morphological descriptors alone.
+
+% Shape features only:
+% selected_vars = {'Area', 'MajorAxisLength', 'MinorAxisLength', ...
+%                  'Eccentricity', 'ConvexArea', 'Circularity', ...
+%                  'EquivDiameter', 'Solidity', 'Extent', 'Perimeter', ...
+%                  'Label'};
+
+% Shape + intensity features (default):
+selected_vars = {'MeanIntensity', 'MaxIntensity', 'MinIntensity', ...
+                 'Area', 'MajorAxisLength', 'MinorAxisLength', ...
+                 'Eccentricity', 'ConvexArea', 'Circularity', ...
+                 'EquivDiameter', 'Solidity', 'Extent', 'Perimeter', ...
+                 'Label'};
+
+classification_table = feature_table(:, selected_vars);
+
+disp('Classification feature table:');
+disp(classification_table);
+
+% -------------------------------------------------------------------------
+%% 7. Export the feature table to an Excel file
+% -------------------------------------------------------------------------
+
+out_filename = 'table_features_masses_1mal_0ben.xlsx';
+writetable(classification_table, out_filename, 'WriteRowNames', true);
+fprintf('\nFeature table saved to: %s\n', fullfile(pwd, out_filename));
